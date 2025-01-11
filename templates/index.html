@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}Cryptocurrency Dashboard{% endblock %}
+
+{% block content %}
+<div class="container text-center mb-5">
+    <h1 class="display-4 fw-bold" style="color: #003366;">Cryptocurrency Dashboard</h1>
+    <p class="lead text-muted">Track and compare trends in cryptocurrency with ease.</p>
+</div>
+
+<!-- Cryptocurrency Selection -->
+<div id="charts" class="container mb-5">
+    <div class="card shadow">
+        <div class="card-header text-center">
+            <h2>Cryptocurrency Line Chart</h2>
+        </div>
+        <div class="card-body">
+            <div class="form-group mb-4">
+                <label for="cryptoSelect" class="form-label">Select Cryptocurrency</label>
+                <select class="form-select" id="cryptoSelect">
+                    <option value="">-- Select Cryptocurrency --</option>
+                    {% for crypto_name, crypto_ticker in cryptos.items() %}
+                        <option value="{{ crypto_ticker }}">{{ crypto_name.capitalize() }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <canvas id="cryptoChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison Charts -->
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header text-center">
+                    <h2>Comparison by Value</h2>
+                </div>
+                <div class="card-body">
+                    <canvas id="cryptoChartComparisonbyValue" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header text-center">
+                    <h2>Comparison by Normalization</h2>
+                </div>
+                <div class="card-body">
+                    <canvas id="cryptoChartComparisonbyNormalization" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cryptocurrency Returns -->
+<div id="returns" class="container mb-5">
+    <div class="card shadow">
+        <div class="card-header text-center">
+            <h2>Cryptocurrency Returns</h2>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Cryptocurrency</th>
+                            <th scope="col">Return (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="returnsTableBody">
+                        <!-- Returns will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#cryptoSelect').change(function() {
+            var selectedCrypto = $(this).val();
+            if (selectedCrypto) {
+                $.post('/get_data', { crypto: selectedCrypto }, function(data) {
+                    var ctx = document.getElementById('cryptoChart').getContext('2d');
+                    var chartData = {
+                        labels: data.timestamps,
+                        datasets: [{
+                            label: selectedCrypto.toUpperCase(),
+                            data: data.values,
+                            borderColor: '#003366',
+                            backgroundColor: 'rgba(0, 51, 102, 0.1)',
+                            fill: true
+                        }]
+                    };
+
+                    if (window.myChart) {
+                        window.myChart.destroy();
+                    }
+
+                    window.myChart = new Chart(ctx, {
+                        type: 'line',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Date'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Price (USD)'
+                                    },
+                                    suggestedMax: Math.max(...data.values) * 1.1
+                                }
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+        $.get('/get_all_data', function(data) {
+            var ctx2 = document.getElementById('cryptoChartComparisonbyValue').getContext('2d');
+            var chartData = {
+                labels: data.labels,
+                datasets: data.datasets.map(function(dataset) {
+                    return {
+                        label: dataset.label,
+                        data: dataset.data,
+                        borderColor: dataset.borderColor,
+                        backgroundColor: dataset.backgroundColor || 'rgba(0, 0, 0, 0)',
+                        fill: false
+                    };
+                })
+            };
+
+            if (window.myComparisonChart) {
+                window.myComparisonChart.destroy();
+            }
+
+            window.myComparisonChart = new Chart(ctx2, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Price (USD)'
+                            },
+                            suggestedMax: Math.max(...data.datasets.flatMap(d => d.data)) * 1.1
+                        }
+                    }
+                }
+            });
+        });
+
+        $.get('/get_all_data?normalized=true', function(data) {
+            var ctx3 = document.getElementById('cryptoChartComparisonbyNormalization').getContext('2d');
+            var chartData = {
+                labels: data.labels,
+                datasets: data.datasets.map(function(dataset) {
+                    return {
+                        label: dataset.label,
+                        data: dataset.data,
+                        borderColor: dataset.borderColor,
+                        backgroundColor: dataset.backgroundColor || 'rgba(0, 0, 0, 0)',
+                        fill: false
+                    };
+                })
+            };
+
+            if (window.myComparisonChartnormal) {
+                window.myComparisonChartnormal.destroy();
+            }
+
+            window.myComparisonChartnormal = new Chart(ctx3, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Value (Normalized)'
+                            },
+                            suggestedMax: Math.max(...data.datasets.flatMap(d => d.data)) * 1.1
+                        }
+                    }
+                }
+            });
+        });
+
+        // Fetch the cryptocurrency returns
+        $.get('/get_returns', function(data) {
+            var returns = data;
+            var tableBody = $('#returnsTableBody');
+
+            tableBody.empty(); // Clear existing content
+
+            for (var crypto in returns) {
+                var returnValue = returns[crypto].toFixed(2); // Format to 2 decimal places
+                var row = `<tr>
+                            <td>${crypto.charAt(0).toUpperCase() + crypto.slice(1)}</td>
+                            <td>${returnValue} %</td>
+                        </tr>`;
+                tableBody.append(row);
+            }
+        });
+
+        // Change navbar background on scroll
+        $(window).scroll(function() {
+            if ($(this).scrollTop() > 50) {
+                $('.navbar').addClass('scrolled');
+            } else {
+                $('.navbar').removeClass('scrolled');
+            }
+        });
+    });
+</script>
+{% endblock %}
